@@ -1,1 +1,1 @@
-from .test_transformator import TestTransformator
+from .test_path import TestPath
