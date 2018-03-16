@@ -1,45 +1,49 @@
-from re import split
-from typing import Any, Dict, List, TypeVar
-from copy import deepcopy
+from .path import Path
+from .transformation import Transformation
+from .wrapper import Wrapper
 
-Container = Dict[str, Any]
-Transformations = Dict[str, str]
 
 class Transformator:
-    def __init__(self, transformations: Transformations, separator: str = '.') -> None:
+    def __init__(self, transformations):
         self._transformations = transformations
-        self._separator = separator
 
-    def roll_out(self, keys: Dict[str, Any]) -> Dict[str, Any]:
-        new_keys = {}
-        for composite_key, val in keys.items():
-            parts = self.split(composite_key)
-            key = parts[0]
-            if len(parts) == 1:
-                new_keys[key] = val
-            else:
-                new_composite_key = self._separator.join(parts[1:])
-                if key not in new_keys:
-                    new_keys[key] = {}
-                new_keys[key][new_composite_key] = val
-        return {k: (self.roll_out(v) if isinstance(v, dict) else v) for k, v in new_keys.items()}
-
-    def split(self, composite_key: str) -> List[str]:
-        pattern = r'(?<!\\)' + '\\' + self._separator
-        return split(pattern, composite_key) if isinstance(composite_key, str) else [composite_key]
-
-    def _transform(self, container: Any, transformations: Transformations) -> Any:
+    def _traverse(self, path, container, handler):
         if isinstance(container, dict):
-            transformed = {}
-            for key, val in container.items():
-                new_key = transformations.get(key, key)
-                if isinstance(new_key, dict):
-                    transformed[key] = self._transform(val, new_key)
-                else:
-                    transformed[new_key] = val
-            return transformed
-        raise TypeError
+            return handler(path, {
+                key: self._traverse(path + key, val, handler)
+                    for key, val in container.items()
+            })
+        elif isinstance(container, list):
+            return handler(path, [
+                self._traverse(path + idx, elem, handler)
+                    for idx, elem in enumerate(container)
+            ])
+        else:
+            return handler(path, container)
 
-    def transform(self, container: Container) -> Container:
-        clone = deepcopy(container)
-        return self._transform(self.roll_out(clone), self.roll_out(self._transformations))
+    def _traverse_tf(self, node, handler):
+        handler(node)
+        return [self._traverse_tf(child, handler) for _, child in node.items()]
+
+    def transform(self, container):
+        wrapper = Wrapper()
+        paths = []
+
+        def handler(path, val):
+            handlers = self._transformations.find(path)
+            if len(handlers) > 0:
+                for handler in handlers:
+                    new_path, new_val = handler(path, val)
+                    wrapper.insert(Path(new_path), new_val)
+            paths.append(path)
+            return val
+
+        self._traverse(Path(), container, handler)
+
+        def tf_handler(node):
+            if not node.optional and node.path not in paths:
+                raise KeyError(str(node.path))
+
+        self._traverse_tf(self._transformations, tf_handler)
+
+        return wrapper.val()
