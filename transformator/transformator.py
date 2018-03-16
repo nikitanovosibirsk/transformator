@@ -6,7 +6,7 @@ from .wrapper import Wrapper
 class tf:
     namespaces = {}
 
-    def __init__(self, old_path, new_path):
+    def __init__(self, old_path, new_path = None):
         self._old_path = old_path
         self._new_path = new_path
 
@@ -24,8 +24,10 @@ class tf:
                 new_key = self._old_path + separator + key
                 new_keys[new_key] = val
             self.namespaces[namespace].update(new_keys)
-        else:
+        elif self._new_path is not None:
             self.namespaces[namespace][self._old_path] = lambda path, val: (self._new_path, fn(path, val))
+        else:
+            self.namespaces[namespace][self._old_path] = fn
 
         return namespace
 
