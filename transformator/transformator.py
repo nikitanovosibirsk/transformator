@@ -25,9 +25,13 @@ class tf:
                 new_keys[new_key] = val
             self.namespaces[namespace].update(new_keys)
         elif self._new_path is not None:
-            self.namespaces[namespace][self._old_path] = lambda path, val: (self._new_path, fn(path, val))
+            if self._old_path not in self.namespaces[namespace]:
+                self.namespaces[namespace][self._old_path] = []
+            self.namespaces[namespace][self._old_path] += [lambda path, val: (self._new_path, fn(path, val))]
         else:
-            self.namespaces[namespace][self._old_path] = fn
+            if self._old_path not in self.namespaces[namespace]:
+                self.namespaces[namespace][self._old_path] = []
+            self.namespaces[namespace][self._old_path] += [fn]
 
         return namespace
 

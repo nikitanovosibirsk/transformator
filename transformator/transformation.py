@@ -70,7 +70,7 @@ class Transformation:
                 head = head[:-1]
                 optional = True
             if len(tail) == 0:
-                node[head] = cls(path + head, optional, [val])
+                node[head] = cls(path + head, optional, val)
             else:
                 new_composite_key = cls.join(tail)
                 if head not in node:
